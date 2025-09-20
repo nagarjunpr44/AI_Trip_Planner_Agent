@@ -141,7 +141,7 @@ The system uses a state-based architecture where each node processes specific da
 | Variable | Description | Required |
 |----------|-------------|----------|
 | `OPENAI_API_KEY` | OpenAI API key for GPT-4 | Yes |
-| `Bright_dataA_PI_KEY` | SERP API key for search operations | Yes |
+| `Bright_dataA_PI_KEY` | API key for search operations | Yes |
 | `REDDIT_CLIENT_ID` | Reddit API client ID | Yes |
 | `REDDIT_CLIENT_SECRET` | Reddit API client secret | Yes |
 | `REDDIT_USER_AGENT` | Reddit API user agent | Yes |
