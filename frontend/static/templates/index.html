@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Travel Planner</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            max-width: 800px;
+        }
+        input, button {
+            padding: 10px;
+            margin: 5px 0;
+            width: 100%;
+        }
+        #response {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            background: #f9f9f9;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>AI Travel Planner</h1>
+    <input type="text" id="userQuestion" placeholder="Ask your travel question...">
+    <button onclick="askQuestion()">Ask</button>
+
+    <div id="response"></div>
+
+    <script>
+        async function askQuestion() {
+            const question = document.getElementById("userQuestion").value;
+            if (!question) return;
+
+            const responseDiv = document.getElementById("response");
+            responseDiv.innerText = "Thinking...";
+
+            try {
+                const res = await fetch("http://127.0.0.1:8000/ask", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ user_question: question })
+                });
+
+                const data = await res.json();
+                responseDiv.innerText = data.final_answer || "No answer found.";
+            } catch (err) {
+                responseDiv.innerText = "Error connecting to backend.";
+                console.error(err);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 import os
 import requests
 from urllib.parse import quote_plus
-from snapshots_operations import download_snapshot, poll_snapshot_status
+from backend.data_sources.snapshots_operations import download_snapshot, poll_snapshot_status
 
 load_dotenv()
 
@@ -71,7 +71,7 @@ def _trigger_and_download_snapshot(trigger_url, params, data, operation_name="op
     return raw_data
 
 
-def reddit_search_api(keyword, date="All time", sort_by="Hot", num_of_posts=75):
+def reddit_search_api(keyword, date="All time", sort_by="Hot", num_of_posts=15):
     trigger_url = "https://api.brightdata.com/datasets/v3/trigger"
 
     params = {

@@ -7,3 +7,9 @@ class Triprequest(BaseModel):
     budget:Optional[float|None]=Field(default=None,description="Total budget if provided")
     interests:List[str]=Field(default=[],description="User interests(e.g, food,adventures)")
     activities:List[str]=Field(default=[],description="User interests(e.g, food,adventures)")
+
+class RedditURLAnalysis(BaseModel):
+    selected_urls:List[str]=Field(description="List of Reddit URLs that contain valuable information for answering the user's question")
+
+
+
