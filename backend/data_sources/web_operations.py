@@ -39,7 +39,7 @@ def serp_search(query, engine="google"):
     url = "https://api.brightdata.com/request"
 
     payload = {
-        "zone": "ai_agent2",
+        "zone": "aiagentsearch",
         "url": f"{base_url}?q={quote_plus(query)}&brd_json=1",
         "format": "raw"
     }
@@ -75,7 +75,7 @@ def reddit_search_api(keyword, date="All time", sort_by="Hot", num_of_posts=75):
     trigger_url = "https://api.brightdata.com/datasets/v3/trigger"
 
     params = {
-        "dataset_id": os.getenv('REDDIT_SEARCH_DATASET_ID'),
+        "dataset_id":"gd_lvz8ah06191smkebj4",
         "include_errors": "true",
         "type": "discover_new",
         "discover_by": "keyword"
@@ -115,7 +115,8 @@ def reddit_post_retrieval(urls, days_back=10, load_all_replies=False, comment_li
     trigger_url = "https://api.brightdata.com/datasets/v3/trigger"
 
     params = {
-        "dataset_id": os.getenv('REDDIT_POST_DATASET_ID'),
+
+        "dataset_id":"gd_lvzdpsdlw09j6t702",
         "include_errors": "true"
     }
 

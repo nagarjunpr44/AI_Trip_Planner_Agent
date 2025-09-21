@@ -4,9 +4,11 @@ from langgraph.graph import StateGraph,START,END
 from langgraph.graph.message import add_messages
 from langchain.chat_models import init_chat_model
 from typing import TypedDict
+from backend.models.trip_request import Triprequest,RedditURLAnalysis
 from pydantic import BaseModel,Field
-from web_operations import serp_search,reddit_search_api,reddit_post_retrieval
-from prompts import (get_reddit_analysis_messages,
+from backend.data_sources.web_operations import serp_search,reddit_search_api,reddit_post_retrieval
+from backend.agent.prompts import (get_trip_request_messages,
+                     get_reddit_analysis_messages,
                      get_google_analysis_messages,
                      get_bing_analysis_messages,
                      get_reddit_url_analysis_messages,
@@ -14,16 +16,15 @@ from prompts import (get_reddit_analysis_messages,
 )
 load_dotenv()
 
-class RedditURLAnalysis(BaseModel):
-    selected_urls:List[str]=Field(description="List of Reddit URLs that contain valuable information for answering the user's question")
-
-
-
 llm=init_chat_model("gpt-4.1-2025-04-14")
+
+
+
 
 class State(TypedDict):
     messages:Annotated[list,add_messages]
     user_question:str | None
+    trip_request:Triprequest|None
     google_results:str|None
     bing_results:str|None
     reddit_results:str|None
@@ -34,27 +35,64 @@ class State(TypedDict):
     reddit_analysis:str|None
     final_answer:str|None
 
-def google_search(state:State):
-    user_question=state.get("user_question","")
-    print(f"Searching Google for :{user_question}")
 
-    google_results=serp_search(user_question,engine="google")
+def extract_trip_parameters(state: State):
+    user_question=state.get("user_question","")
+    
+    if not user_question:
+        return{"trip_request":None}
+    
+    messages=get_trip_request_messages(user_question)
+    structured_llm=llm.with_structured_output(Triprequest)
+
+    try:
+        trip_request=structured_llm.invoke(messages)
+        print(f"Extracted Trip Request:{trip_request}")
+    except Exception as e:
+        print(f"Failed to parse trip request:{e}")
+        trip_request=None
+    
+    return{"trip_request":trip_request}
+
+def google_search(state:State):
+    trip_request=state.get("trip_request")
+
+    if trip_request:
+        search_query=f"Trip to {trip_request.destination},activities:{','.join(trip_request.activities)},interests:{','.join(trip_request.interests)}"
+    else:
+        search_query=state.get("user_question","")
+
+    print(f"Searching Google for :{search_query}")
+
+    google_results=serp_search(search_query,engine="google")
 
     return {"google_results":google_results}
 
 
 def bing_search(state:State):
-    user_question=state.get("user_question","")
-    print(f"Searching Bing for :{user_question}")
-    bing_results=serp_search(user_question,engine="bing")
+    trip_request=state.get("trip_request")
+
+    if trip_request:
+        search_query=f"Trip to {trip_request.destination},activities:{','.join(trip_request.activities)},interests:{','.join(trip_request.interests)}"
+    else:
+        search_query=state.get("user_question","")
+
+    print(f"Searching Bing for :{search_query}")
+    bing_results=serp_search(search_query,engine="bing")
 
     return {"bing_results":bing_results}
 
 def reddit_search(state:State):
-    user_question=state.get("user_question","")
-    print(f"Searching Reddit for :{user_question}")
+    trip_request=state.get("trip_request")
 
-    reddit_results=reddit_search_api(user_question)
+    if trip_request:
+        search_query=f"Trip to {trip_request.destination},activities:{','.join(trip_request.activities)},interests:{','.join(trip_request.interests)}"
+    else:
+        search_query=state.get("user_question","")
+
+    print(f"Searching Reddit for :{search_query}")
+
+    reddit_results=reddit_search_api(search_query)
     print(reddit_results)
 
     return {"reddit_results":reddit_results}
@@ -108,10 +146,14 @@ def retrieve_reddit_posts(state:State):
 def analyze_google_results(state:State):
     print("Analyzing google search results")
 
-    user_question = state.get("user_question", "")
+    trip_request=state.get("trip_request")
+    if trip_request:
+        search_context=f"Trip to {trip_request.destination},activities:{','.join(trip_request.activities)},interests:{','.join(trip_request.interests)}"
+    else:
+        search_context=state.get("user_question","")
     google_results = state.get("google_results", "")
 
-    messages = get_google_analysis_messages(user_question, google_results)
+    messages = get_google_analysis_messages(search_context, google_results,trip_request)
     reply = llm.invoke(messages)
 
     return {"google_analysis": reply.content}
@@ -120,10 +162,14 @@ def analyze_google_results(state:State):
 def analyze_bing_results(state:State):
     print("Analyzing bing search results")
 
-    user_question = state.get("user_question", "")
+    trip_request=state.get("trip_request")
+    if trip_request:
+        search_context=f"Trip to {trip_request.destination},activities:{','.join(trip_request.activities)},interests:{','.join(trip_request.interests)}"
+    else:
+        search_context=state.get("user_question","")
     bing_results = state.get("bing_results", "")
 
-    messages = get_bing_analysis_messages(user_question, bing_results)
+    messages = get_bing_analysis_messages(search_context, bing_results,trip_request)
     reply = llm.invoke(messages)
 
     return {"bing_analysis": reply.content}
@@ -132,11 +178,15 @@ def analyze_bing_results(state:State):
 def analyze_reddit_results(state:State):
     print("Analyzing reddit search results")
 
-    user_question = state.get("user_question", "")
+    trip_request=state.get("trip_request")
+    if trip_request:
+        search_context=f"Trip to {trip_request.destination},activities:{','.join(trip_request.activities)},interests:{','.join(trip_request.interests)}"
+    else:
+        search_context=state.get("user_question","")
     reddit_results = state.get("reddit_results", "")
     reddit_post_data = state.get("reddit_post_data", "")
 
-    messages = get_reddit_analysis_messages(user_question, reddit_results, reddit_post_data)
+    messages = get_reddit_analysis_messages(search_context, reddit_results, reddit_post_data,trip_request)
     reply = llm.invoke(messages)
 
     return {"reddit_analysis": reply.content}
@@ -145,13 +195,19 @@ def analyze_reddit_results(state:State):
 def synthesize_analyses(state:State):
     print("Combine all results together")
 
-    user_question = state.get("user_question", "")
+    trip_request=state.get("trip_request")
+
+    if trip_request:
+        search_context=f"Trip to {trip_request.destination},activities:{','.join(trip_request.activities)},interests:{','.join(trip_request.interests)}"
+    else:
+        search_context=state.get("user_question","")
+
     google_analysis = state.get("google_analysis", "")
     bing_analysis = state.get("bing_analysis", "")
     reddit_analysis = state.get("reddit_analysis", "")
 
     messages = get_synthesis_messages(
-        user_question, google_analysis, bing_analysis, reddit_analysis
+        search_context, google_analysis, bing_analysis, reddit_analysis
     )
 
     reply = llm.invoke(messages)
@@ -161,6 +217,9 @@ def synthesize_analyses(state:State):
 
 
 graph_builder=StateGraph(State)
+
+
+graph_builder.add_node("extract_trip_parameters",extract_trip_parameters)
 
 graph_builder.add_node("google_search",google_search)
 graph_builder.add_node("bing_search",bing_search)
@@ -175,10 +234,11 @@ graph_builder.add_node("analyze_reddit_results",analyze_reddit_results)
 
 graph_builder.add_node("synthesize_analyses",synthesize_analyses)
 
+graph_builder.add_edge(START,"extract_trip_parameters")
 
-graph_builder.add_edge(START,"google_search")
-graph_builder.add_edge(START,"bing_search")
-graph_builder.add_edge(START,"reddit_search")
+graph_builder.add_edge("extract_trip_parameters","google_search")
+graph_builder.add_edge("extract_trip_parameters","bing_search")
+graph_builder.add_edge("extract_trip_parameters","reddit_search")
 
 graph_builder.add_edge("google_search","analyze_reddit_posts")
 graph_builder.add_edge("bing_search","analyze_reddit_posts")
@@ -199,7 +259,7 @@ graph_builder.add_edge("synthesize_analyses",END)
 graph=graph_builder.compile()
 
 def run_chatbot():
-    print("Multi-Research-Agent")
+    print("AI-Agent Travel Planner")
     print("Type 'exit' to quit\n")
 
     while True:
@@ -211,6 +271,7 @@ def run_chatbot():
         state={
             "messages":[{"role":"user","content":user_input}],
             "user_question":user_input,
+            "trip_request":None,
             "google_results": None,
             "bing_results": None,
             "reddit_results": None,

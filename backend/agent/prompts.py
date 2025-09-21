@@ -1,4 +1,5 @@
 from typing import Dict, Any
+from backend.models.trip_request import Triprequest
 
 
 class PromptTemplates:
@@ -18,9 +19,10 @@ Analyze the provided Reddit results and identify URLs of posts that contain valu
 Return a structured response with the selected URLs."""
 
     @staticmethod
-    def reddit_url_analysis_user(user_question: str, reddit_results: str) -> str:
-        """User prompt for analyzing Reddit URLs."""
-        return f"""User Question: {user_question}
+    def reddit_url_analysis_user(user_question: str, reddit_results: str,trip_request:"Triprequest | None"=None) -> str:
+        """User prompt for analyzing Reddit search results."""
+        trip_info=f"\n Trip Request Details:{trip_request}"if trip_request else ""
+        return f"""Question: {user_question}{trip_info}
 
 Reddit Results: {reddit_results}
 
@@ -40,13 +42,21 @@ Focus on:
 Provide a concise analysis highlighting the most relevant findings."""
 
     @staticmethod
-    def google_analysis_user(user_question: str, google_results: str) -> str:
+    def google_analysis_user(user_question: str, google_results: str,trip_request:"Triprequest | None"=None) -> str:
         """User prompt for analyzing Google search results."""
-        return f"""Question: {user_question}
+        trip_info=f"\n Trip Request Details:{trip_request}"if trip_request else ""
+        return f"""Question: {user_question}{trip_info}
 
-Google Search Results: {google_results}
 
-Please analyze these Google results and extract the key insights that help answer the question."""
+    Google Search Results: {google_results}
+
+    Based on this information, provide actionable insights for planning a trip. Include:
+    - Recommended places to visit
+    - Popular activities related to the user's interests
+    - Any relevant travel tips or considerations
+    - Summarize conflicting information or choices
+
+    Use a clear, structured format for easy reading."""
 
     @staticmethod
     def bing_analysis_system() -> str:
@@ -62,9 +72,10 @@ Focus on:
 Provide a concise analysis highlighting unique findings and perspectives."""
 
     @staticmethod
-    def bing_analysis_user(user_question: str, bing_results: str) -> str:
+    def bing_analysis_user(user_question: str, bing_results: str,trip_request:"Triprequest | None"=None) -> str:
         """User prompt for analyzing Bing search results."""
-        return f"""Question: {user_question}
+        trip_info=f"\n Trip Request Details:{trip_request}"if trip_request else ""
+        return f"""Question: {user_question}{trip_info}
 
 Bing Search Results: {bing_results}
 
@@ -73,24 +84,25 @@ Please analyze these Bing results and extract insights that complement other sea
     @staticmethod
     def reddit_analysis_system() -> str:
         """System prompt for analyzing Reddit discussions."""
-        return """You are an expert at analyzing social media discussions. Analyze the provided Reddit content to extract community insights and user experiences.
+        return """You are a travel research expert analyzing social media discussions. Extract insights that help a user plan a trip.
 
-Focus on:
-- Real user experiences and testimonials
-- Community consensus and popular opinions
-- Practical tips and advice from users
-- Different perspectives and debates
-- Specific quotes from posts and comments (use quotation marks)
+    Focus on:
+    - Community experiences and tips
+    - Recommended activities and places
+    - Warnings or pitfalls mentioned by users
+    - Popular or highly-upvoted opinions
+    - Provide information in a structured, clear format
 
-IMPORTANT: When referencing specific content, directly quote it and mention the subreddit or context.
-Highlight both positive and negative experiences, controversies, and varying opinions."""
+    IMPORTANT: When referencing specific content, directly quote it and mention the subreddit or context.
+    Highlight both positive and negative experiences, controversies, and varying opinions."""
 
     @staticmethod
     def reddit_analysis_user(
-        user_question: str, reddit_results: str, reddit_post_data: list
+        user_question: str, reddit_results: str, reddit_post_data: list,trip_request:"Triprequest | None"=None
     ) -> str:
         """User prompt for analyzing Reddit discussions."""
-        return f"""Question: {user_question}
+        trip_info=f"\n Trip Request Details:{trip_request}"if trip_request else ""
+        return f"""Question: {user_question}{trip_info}
 
 Reddit Search Results: {reddit_results}
 
@@ -111,7 +123,9 @@ Your task:
 - Cite the source type (Google, Bing, Reddit) for key claims
 - Highlight any contradictions or uncertainties
 
-Create a comprehensive answer that addresses the user's question from multiple angles."""
+Create a comprehensive answer that addresses the user's question from multiple angles.
+
+"""
 
     @staticmethod
     def synthesis_user(
@@ -119,17 +133,49 @@ Create a comprehensive answer that addresses the user's question from multiple a
         google_analysis: str,
         bing_analysis: str,
         reddit_analysis: str,
+        trip_request:"Triprequest | None"=None
     ) -> str:
         """User prompt for synthesizing all analyses."""
-        return f"""Question: {user_question}
+        trip_info=f"\n Trip Request Details:{trip_request}"if trip_request else ""
 
-Google Analysis: {google_analysis}
+        return f"""Question: {user_question}{trip_info}
 
-Bing Analysis: {bing_analysis}
+    Google Analysis: {google_analysis}
 
-Reddit Community Analysis: {reddit_analysis}
+    Bing Analysis: {bing_analysis}
 
-Please synthesize these analyses into a comprehensive answer that addresses the question from multiple perspectives."""
+    Reddit Community Analysis: {reddit_analysis}
+
+    Synthesize these analyses into a comprehensive trip plan:
+    - Highlight recommended destinations, activities, and interests
+    - Include pros/cons or conflicting opinions
+    - Present the answer in a structured, readable format
+    - Use clear sections for each source if needed
+
+    """
+
+    
+    @staticmethod
+    def trip_request_system() -> str:
+        """System prompt for extracting trip request details."""
+        return (
+            "You are an expert travel planner and data extractor. "
+            "Your task is to carefully read the user's input and extract the following structured information:\n"
+            "1. destination: The city, country, or region the user wants to visit.\n"
+            "2. days: Number of days for the trip.\n"
+            "3. budget: Total budget in numeric form if mentioned; otherwise return null.\n"
+            "4. interests: List of user interests or travel preferences (e.g., food, adventure, museums, beaches). "
+            "If not mentioned, return an empty list.\n\n"
+            "Return the result strictly in JSON format matching this structure:\n"
+            "{'destination': str | None, 'days': int | None, 'budget': float | None, 'interests': list[str]}"
+        )
+
+    @staticmethod
+    def trip_request_user(user_input: str) -> str:
+        """User prompt for extracting trip request details."""
+        return f"User Input: {user_input}"
+
+        
 
 
 def create_message_pair(system_prompt: str, user_prompt: str) -> list[Dict[str, Any]]:
@@ -150,6 +196,15 @@ def create_message_pair(system_prompt: str, user_prompt: str) -> list[Dict[str, 
 
 
 # Convenience functions for creating complete message arrays
+def get_trip_request_messages(user_input: str) -> list[Dict[str, Any]]:
+    """Create system and user messages for TripRequest extraction."""
+    return create_message_pair(
+        PromptTemplates.trip_request_system(),
+        PromptTemplates.trip_request_user(user_input)
+    )
+
+
+
 def get_reddit_url_analysis_messages(
     user_question: str, reddit_results: str) -> list[Dict[str, Any]]:
     """Get messages for Reddit URL analysis."""
@@ -160,44 +215,44 @@ def get_reddit_url_analysis_messages(
 
 
 def get_google_analysis_messages(
-    user_question: str, google_results: str
+    user_question: str, google_results: str,trip_request:"Triprequest |None"=None
 ) -> list[Dict[str, Any]]:
     """Get messages for Google results analysis."""
     return create_message_pair(
         PromptTemplates.google_analysis_system(),
-        PromptTemplates.google_analysis_user(user_question, google_results),
+        PromptTemplates.google_analysis_user(user_question, google_results,trip_request),
     )
 
 
 def get_bing_analysis_messages(
-    user_question: str, bing_results: str
+    user_question: str, bing_results: str,trip_request:"Triprequest |None"=None
 ) -> list[Dict[str, Any]]:
     """Get messages for Bing results analysis."""
     return create_message_pair(
         PromptTemplates.bing_analysis_system(),
-        PromptTemplates.bing_analysis_user(user_question, bing_results),
+        PromptTemplates.bing_analysis_user(user_question, bing_results,trip_request),
     )
 
 
 def get_reddit_analysis_messages(
-    user_question: str, reddit_results: str, reddit_post_data: list
+    user_question: str, reddit_results: str, reddit_post_data: list,trip_request:"Triprequest |None"=None
 ) -> list[Dict[str, Any]]:
     """Get messages for Reddit discussions analysis."""
     return create_message_pair(
         PromptTemplates.reddit_analysis_system(),
         PromptTemplates.reddit_analysis_user(
-            user_question, reddit_results, reddit_post_data
+            user_question, reddit_results, reddit_post_data,trip_request
         ),
     )
 
 
 def get_synthesis_messages(
-    user_question: str, google_analysis: str, bing_analysis: str, reddit_analysis: str
+    user_question: str, google_analysis: str, bing_analysis: str, reddit_analysis: str,trip_request:"Triprequest |None"=None
 ) -> list[Dict[str, Any]]:
     """Get messages for final synthesis."""
     return create_message_pair(
         PromptTemplates.synthesis_system(),
         PromptTemplates.synthesis_user(
-            user_question, google_analysis, bing_analysis, reddit_analysis
+            user_question, google_analysis, bing_analysis, reddit_analysis,trip_request
         ),
     )
